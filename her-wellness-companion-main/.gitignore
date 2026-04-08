@@ -24,7 +24,7 @@ dist-ssr
 *.sw?
 
 .env
-supabase
+
 .env.local
 .env.development.local
 .env.test.local

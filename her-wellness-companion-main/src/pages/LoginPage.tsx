@@ -9,15 +9,36 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setMessage('');
+    setLoading(true);
+    const { error } = await signInWithGoogle();
+    if (error) setError(error);
+    setLoading(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setMessage('');
     setLoading(true);
-    const fn = isSignUp ? signUpWithEmail : signInWithEmail;
-    const { error } = await fn(email, password);
-    if (error) setError(error);
+
+    if (isSignUp) {
+      const { error, needsEmailVerification } = await signUpWithEmail(email, password);
+      if (error) {
+        setError(error);
+      } else if (needsEmailVerification) {
+        setMessage('Account created. Please check your email to verify your account before signing in.');
+      }
+    } else {
+      const { error } = await signInWithEmail(email, password);
+      if (error) setError(error);
+    }
+
     setLoading(false);
   };
 
@@ -36,7 +57,8 @@ export default function LoginPage() {
           </div>
 
           <button
-            onClick={signInWithGoogle}
+            onClick={handleGoogleSignIn}
+            disabled={loading}
             className="w-full flex items-center justify-center gap-3 rounded-xl border border-border bg-card px-4 py-3 text-sm font-medium text-foreground hover:bg-accent transition-colors mb-6"
           >
             <svg width="20" height="20" viewBox="0 0 24 24">
@@ -83,6 +105,7 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
+            {message && <p className="text-sm text-emerald-600">{message}</p>}
 
             <button
               type="submit"
@@ -95,7 +118,7 @@ export default function LoginPage() {
 
           <p className="text-center text-sm text-muted-foreground mt-6">
             {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
-            <button onClick={() => { setIsSignUp(!isSignUp); setError(''); }} className="text-primary font-semibold hover:underline">
+            <button onClick={() => { setIsSignUp(!isSignUp); setError(''); setMessage(''); }} className="text-primary font-semibold hover:underline">
               {isSignUp ? 'Sign In' : 'Sign Up'}
             </button>
           </p>

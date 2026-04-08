@@ -1,15 +1,14 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { lovable } from '@/integrations/lovable';
 import type { User, Session } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signInWithGoogle: () => Promise<void>;
+  signInWithGoogle: () => Promise<{ error: string | null }>;
   signInWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null }>;
+  signUpWithEmail: (email: string, password: string) => Promise<{ error: string | null; needsEmailVerification: boolean }>;
   signOut: () => Promise<void>;
 }
 
@@ -19,6 +18,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const authRedirectTo = import.meta.env.VITE_AUTH_REDIRECT_TO || window.location.origin;
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -37,9 +37,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
-    await lovable.auth.signInWithOAuth('google', {
-      redirect_uri: window.location.origin,
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: authRedirectTo,
+      },
     });
+
+    return { error: error?.message ?? null };
   };
 
   const signInWithEmail = async (email: string, password: string) => {
@@ -48,12 +53,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUpWithEmail = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    return { error: error?.message ?? null };
+    const { data, error } = await supabase.auth.signUp(
+      authRedirectTo
+        ? {
+            email,
+            password,
+            options: { emailRedirectTo: authRedirectTo },
+          }
+        : {
+            email,
+            password,
+          },
+    );
+    return {
+      error: error?.message ?? null,
+      needsEmailVerification: !data.session,
+    };
   };
 
   const signOut = async () => {
